@@ -63,7 +63,7 @@ const { errorHandler } = require('./middleware/errorHandler');
 const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
-const PORT = 3001;
+const PORT = 3000;
 
 /* =======================
    SECURITY
