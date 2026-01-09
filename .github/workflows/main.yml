@@ -1,25 +1,36 @@
+
 name: Backend CI/CD
 
 on:
   push:
-    branches: [dev, uat, main]
+    branches:
+      - dev
+      - uat
+      - main
 
 jobs:
-  deploy:
+  map_env:
     runs-on: ubuntu-latest
-
+    outputs:
+      target_env: ${{ steps.set-env.outputs.ENV }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set Environment
+      - id: set-env
         run: |
-          if [[ "$GITHUB_REF" == "refs/heads/dev" ]]; then
-            echo "ENV=dev" >> $GITHUB_ENV
-          elif [[ "$GITHUB_REF" == "refs/heads/uat" ]]; then
-            echo "ENV=uat" >> $GITHUB_ENV
+          if [[ "${{ github.ref }}" == "refs/heads/dev" ]]; then
+            echo "ENV=dev" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/uat" ]]; then
+            echo "ENV=uat" >> $GITHUB_OUTPUT
           else
-            echo "ENV=prod" >> $GITHUB_ENV
+            echo "ENV=prod" >> $GITHUB_OUTPUT
           fi
+  deploy:
+    needs: map_env
+    runs-on: ubuntu-latest
+    environment: ${{ needs.map_env.outputs.target_env }}
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Docker Login
         uses: docker/login-action@v3
@@ -30,17 +41,19 @@ jobs:
       - name: Build & Push Image
         uses: docker/build-push-action@v5
         with:
+          context: .
           push: true
-          tags: yourdockerhub/backend-api:${{ env.ENV }}
+          # Note the formatting of tags here to ensure YAML 1.2 compliance
+          tags: confideleapcrm/backend-api:${{ needs.map_env.outputs.target_env }}
 
-      - name: Deploy to VPS
+      - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd /var/www/backend-${{ env.ENV }}
+            cd /var/www/backend-${{ needs.map_env.outputs.target_env }}
             docker compose pull
             docker compose up -d
             docker image prune -f
