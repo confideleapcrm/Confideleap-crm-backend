@@ -67,11 +67,11 @@ const PORT = process.env.PORT || 3000;
 /* =======================
    SECURITY
 ======================= */
-app.use(helmet());
 app.use(
   cors({
     origin: [
       process.env.FRONTEND_URL,
+      "https://irm.confideleap.com",
       "http://localhost:5173",
       "http://localhost:4173",
     ],
