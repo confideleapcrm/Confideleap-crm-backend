@@ -1,0 +1,46 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [dev, uat, main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set Environment
+        run: |
+          if [[ "$GITHUB_REF" == "refs/heads/dev" ]]; then
+            echo "ENV=dev" >> $GITHUB_ENV
+          elif [[ "$GITHUB_REF" == "refs/heads/uat" ]]; then
+            echo "ENV=uat" >> $GITHUB_ENV
+          else
+            echo "ENV=prod" >> $GITHUB_ENV
+          fi
+
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & Push Image
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: yourdockerhub/backend-api:${{ env.ENV }}
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /var/www/backend-${{ env.ENV }}
+            docker compose pull
+            docker compose up -d
+            docker image prune -f
