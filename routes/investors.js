@@ -17,6 +17,8 @@ const toPgArray = (val) => {
   return [val]; // wrap single string safely
 };
 
+
+
 /* ======================================================
    REDIS / QUEUE CONFIG (UNCHANGED)
 ====================================================== */
@@ -390,23 +392,23 @@ router.get("/:id", async (req, res) => {
       updatedAt: investor.updated_at,
       firm: firm
         ? {
-            id: firm.id,
-            name: firm.name,
-            type: firm.type,
-            website: firm.website,
-            headquarters: firm.headquarters,
-            aum: firm.aum !== null ? Number(firm.aum) : null,
-          }
+          id: firm.id,
+          name: firm.name,
+          type: firm.type,
+          website: firm.website,
+          headquarters: firm.headquarters,
+          aum: firm.aum !== null ? Number(firm.aum) : null,
+        }
         : null,
       portfolioFit: portfolioFit
         ? {
-            overallFitScore: portfolioFit.overall_fit_score,
-            sectorFitScore: portfolioFit.sector_fit_score,
-            stageFitScore: portfolioFit.stage_fit_score,
-            geographicFitScore: portfolioFit.geographic_fit_score,
-            checkSizeFitScore: portfolioFit.check_size_fit_score,
-            lastCalculated: portfolioFit.last_calculated,
-          }
+          overallFitScore: portfolioFit.overall_fit_score,
+          sectorFitScore: portfolioFit.sector_fit_score,
+          stageFitScore: portfolioFit.stage_fit_score,
+          geographicFitScore: portfolioFit.geographic_fit_score,
+          checkSizeFitScore: portfolioFit.check_size_fit_score,
+          lastCalculated: portfolioFit.last_calculated,
+        }
         : null,
       recentCommunications: commsRes.rows.map((c) => ({
         id: c.id,
@@ -548,18 +550,134 @@ router.post("/", validateRequest(createInvestorSchema), async (req, res) => {
 /* ======================================================
    UPDATE INVESTOR
 ====================================================== */
+// router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const updates = req.body;
+
+//     const exists = await db.query(
+//       `
+//       SELECT id
+//       FROM investors
+//       WHERE id = $1 AND created_by = $2 AND is_active = true
+//       `,
+//       [id, req.user.id]
+//     );
+
+//     if (!exists.rows.length) {
+//       return res.status(404).json({ error: "Investor not found" });
+//     }
+
+//     const map = {
+//       firstName: "first_name",
+//       lastName: "last_name",
+//       email: "email",
+//       phone: "phone",
+//       jobTitle: "job_title",
+//       seniorityLevel: "seniority_level",
+//       bio: "bio",
+//       avatarUrl: "avatar_url",
+//       linkedinUrl: "linkedin_url",
+//       twitterUrl: "twitter_url",
+//       personalWebsite: "personal_website",
+//       location: "location",
+//       firmId: "firm_id",
+//       investmentStages: "investment_stages",
+//       sectorPreferences: "sector_preferences",
+//       geographicPreferences: "geographic_preferences",
+//       minCheckSize: "min_check_size",
+//       maxCheckSize: "max_check_size",
+//       portfolioCompanies: "portfolio_companies",
+//       notableInvestments: "notable_investments",
+//       education: "education",
+//       experience: "experience",
+//       status: "status",
+//       tags: "tags",
+//       notes: "notes",
+//       buySellSide: "buy_sell_side",
+//       aum: "aum",
+//     };
+
+//     const fields = [];
+//     const values = [];
+//     let i = 0;
+
+//     const arrayFields = [
+//       "investmentStages",
+//       "sectorPreferences",
+//       "geographicPreferences",
+//       "portfolioCompanies",
+//       "notableInvestments",
+//       "education",
+//       "experience",
+//       "tags",
+//     ];
+
+//     Object.keys(map).forEach((k) => {
+//       if (updates[k] !== undefined) {
+//         fields.push(`${map[k]} = $${++i}`);
+//         values.push(
+//           arrayFields.includes(k) ? toPgArray(updates[k]) : updates[k]
+//         );
+//       }
+//     });
+
+//     if (!fields.length) {
+//       return res.status(400).json({ error: "No fields to update" });
+//     }
+
+//     fields.push(`updated_at = NOW()`);
+
+//     await db.query(
+//       `
+//       UPDATE investors
+//       SET ${fields.join(", ")}
+//       WHERE id = $${++i}
+//       `,
+//       [...values, id]
+//     );
+
+//     res.json({ message: "Investor updated successfully" });
+//   } catch (err) {
+//     console.error("Update investor error:", err);
+//     res.status(500).json({ error: "Failed to update investor" });
+//   }
+// });
+
+
 router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
   try {
+    console.log("🔥 HIT UPDATE INVESTOR ROUTE", req.params.id);
+
     const { id } = req.params;
     const updates = req.body;
 
+    // 🔒 Normalize buy_sell_side (VERY IMPORTANT)
+    if (
+      updates.buySellSide === "" ||
+      updates.buySellSide === undefined
+    ) {
+      updates.buySellSide = null;
+    }
+
+    // Optional: enforce allowed values
+    const ALLOWED_BUY_SELL = ["buy", "sell", "both"];
+    if (
+      updates.buySellSide &&
+      !ALLOWED_BUY_SELL.includes(updates.buySellSide)
+    ) {
+      updates.buySellSide = null;
+    }
+
+
+    // 1. Check existence only
     const exists = await db.query(
       `
       SELECT id
       FROM investors
-      WHERE id = $1 AND created_by = $2 AND is_active = true
+      WHERE id = $1 AND is_active = true
       `,
-      [id, req.user.id]
+      [id]
     );
 
     if (!exists.rows.length) {
@@ -596,10 +714,6 @@ router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
       aum: "aum",
     };
 
-    const fields = [];
-    const values = [];
-    let i = 0;
-
     const arrayFields = [
       "investmentStages",
       "sectorPreferences",
@@ -611,11 +725,15 @@ router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
       "tags",
     ];
 
-    Object.keys(map).forEach((k) => {
-      if (updates[k] !== undefined) {
-        fields.push(`${map[k]} = $${++i}`);
+    const fields = [];
+    const values = [];
+    let i = 0;
+
+    Object.keys(map).forEach((key) => {
+      if (updates[key] !== undefined) {
+        fields.push(`${map[key]} = $${++i}`);
         values.push(
-          arrayFields.includes(k) ? toPgArray(updates[k]) : updates[k]
+          arrayFields.includes(key) ? toPgArray(updates[key]) : updates[key]
         );
       }
     });
@@ -624,16 +742,21 @@ router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
       return res.status(400).json({ error: "No fields to update" });
     }
 
+    // always update timestamp
     fields.push(`updated_at = NOW()`);
 
-    await db.query(
-      `
+    const query = `
       UPDATE investors
       SET ${fields.join(", ")}
       WHERE id = $${++i}
-      `,
-      [...values, id]
-    );
+      RETURNING id
+    `;
+
+    const result = await db.query(query, [...values, id]);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Investor not found" });
+    }
 
     res.json({ message: "Investor updated successfully" });
   } catch (err) {
@@ -641,6 +764,7 @@ router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
     res.status(500).json({ error: "Failed to update investor" });
   }
 });
+
 
 /* ======================================================
    DELETE INVESTOR (SOFT DELETE)
@@ -679,13 +803,13 @@ router.get("/targeting/list", async (req, res) => {
     const toArray = (v) =>
       Array.isArray(v)
         ? v
-            .map(String)
-            .map((s) => s.trim())
-            .filter(Boolean)
+          .map(String)
+          .map((s) => s.trim())
+          .filter(Boolean)
         : String(v || "")
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
 
     const sectors = toArray(req.query.sectors);
     const firmTypesRaw = toArray(
@@ -822,3 +946,68 @@ router.get("/targeting/list", async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
