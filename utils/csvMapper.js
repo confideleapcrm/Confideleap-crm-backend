@@ -1,5 +1,7 @@
 // api/utils/csvMapper.js
-export const investorMapper = (raw = []) => {
+function investorMapper(raw) {
+  raw = raw || {};
+
   return {
     firstName: raw["First Name"] || raw.firstName,
     lastName: raw["Last Name"] || raw.lastName,
@@ -22,19 +24,25 @@ export const investorMapper = (raw = []) => {
     investmentStages: raw["Investment Stages"]
       ? String(raw["Investment Stages"])
           .split(",")
-          .map((s) => s.trim())
+          .map(function (s) {
+            return s.trim();
+          })
       : raw.investmentStages || [],
 
     sectorPreferences: raw["Sector Preferences"]
       ? String(raw["Sector Preferences"])
           .split(",")
-          .map((s) => s.trim())
+          .map(function (s) {
+            return s.trim();
+          })
       : raw.sectorPreferences || [],
 
     geographicPreferences: raw["Geographic Preferences"]
       ? String(raw["Geographic Preferences"])
           .split(",")
-          .map((s) => s.trim())
+          .map(function (s) {
+            return s.trim();
+          })
       : raw.geographicPreferences || [],
 
     minCheckSize: raw["Min Check Size"]
@@ -48,13 +56,17 @@ export const investorMapper = (raw = []) => {
     portfolioCompanies: raw["Portfolio Companies"]
       ? String(raw["Portfolio Companies"])
           .split(",")
-          .map((s) => s.trim())
+          .map(function (s) {
+            return s.trim();
+          })
       : raw.portfolioCompanies || [],
 
     notableInvestments: raw["Notable Investments"]
       ? String(raw["Notable Investments"])
           .split(",")
-          .map((s) => s.trim())
+          .map(function (s) {
+            return s.trim();
+          })
       : raw.notableInvestments || [],
 
     education: raw.education || [],
@@ -64,10 +76,17 @@ export const investorMapper = (raw = []) => {
     tags: raw["Tags"]
       ? String(raw["Tags"])
           .split(",")
-          .map((s) => s.trim())
+          .map(function (s) {
+            return s.trim();
+          })
       : raw.tags || [],
 
     notes: raw["Notes"] || raw.notes || null,
     createdAt: raw.createdAt ? new Date(raw.createdAt) : new Date(),
   };
+}
+
+// CommonJS export
+module.exports = {
+  investorMapper: investorMapper,
 };

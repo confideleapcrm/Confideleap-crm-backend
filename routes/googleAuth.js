@@ -11,13 +11,9 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const REDIRECT_URI =
   process.env.GOOGLE_REDIRECT_URI ||
-  "http://localhost:3001/api/googleAuth/callback";
+  "http://localhost:4001/api/googleAuth/callback";
 
-const oauth2Client = new OAuth2Client(
-  CLIENT_ID,
-  CLIENT_SECRET,
-  REDIRECT_URI
-);
+const oauth2Client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 
 // =======================================================
 // Helper: base64 encode/decode state JSON
@@ -103,8 +99,7 @@ router.get("/callback", async (req, res) => {
 
     const userIdFromState = state?.userId || null;
     const userIdFromQuery = req.query.userId || null;
-    const userIdFromCookie =
-      req.cookies?.google_connect_user || null;
+    const userIdFromCookie = req.cookies?.google_connect_user || null;
 
     const effectiveUserId =
       (req.user && req.user.id) ||
@@ -169,8 +164,7 @@ router.get("/callback", async (req, res) => {
     } catch {}
 
     const returnUrl =
-      process.env.GOOGLE_AFTER_CONNECT_URL ||
-      "http://localhost:5173/settings";
+      process.env.GOOGLE_AFTER_CONNECT_URL || "http://localhost:5173/settings";
 
     return res.redirect(returnUrl);
   } catch (err) {
@@ -180,4 +174,3 @@ router.get("/callback", async (req, res) => {
 });
 
 module.exports = router;
-

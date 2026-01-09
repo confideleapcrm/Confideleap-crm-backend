@@ -20,18 +20,18 @@ const toPgArray = (val) => {
 /* ======================================================
    REDIS / QUEUE CONFIG (UNCHANGED)
 ====================================================== */
-let connection;
-if (process.env.REDIS_URL) {
-  const redisUrl = new URL(process.env.REDIS_URL);
-  connection = {
-    host: redisUrl.hostname,
-    port: Number(redisUrl.port),
-    password: redisUrl.password || undefined,
-    tls: redisUrl.protocol === "rediss:" ? {} : undefined,
-  };
-} else {
-  connection = { host: "127.0.0.1", port: 6379 };
-}
+// let connection;
+// if (process.env.REDIS_URL) {
+//   const redisUrl = new URL(process.env.REDIS_URL);
+//   connection = {
+//     host: redisUrl.hostname,
+//     port: Number(redisUrl.port),
+//     password: redisUrl.password || undefined,
+//     tls: redisUrl.protocol === "rediss:" ? {} : undefined,
+//   };
+// } else {
+//   connection = { host: "127.0.0.1", port: 6379 };
+// }
 
 const router = express.Router();
 
@@ -46,7 +46,7 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage });
-const importQueue = new Queue("investor-import", { connection });
+// const importQueue = new Queue("investor-import", { connection });
 
 /* ======================================================
    VALIDATION SCHEMAS (UNCHANGED)
@@ -550,16 +550,19 @@ router.post("/", validateRequest(createInvestorSchema), async (req, res) => {
 ====================================================== */
 router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
   try {
+    console.log("🔥 HIT UPDATE INVESTOR ROUTE", req.params.id);
+
     const { id } = req.params;
     const updates = req.body;
 
+    // 1. Check only existence (no ownership)
     const exists = await db.query(
       `
       SELECT id
       FROM investors
-      WHERE id = $1 AND created_by = $2 AND is_active = true
+      WHERE id = $1 AND is_active = true
       `,
-      [id, req.user.id]
+      [id]
     );
 
     if (!exists.rows.length) {
@@ -596,10 +599,6 @@ router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
       aum: "aum",
     };
 
-    const fields = [];
-    const values = [];
-    let i = 0;
-
     const arrayFields = [
       "investmentStages",
       "sectorPreferences",
@@ -611,11 +610,15 @@ router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
       "tags",
     ];
 
-    Object.keys(map).forEach((k) => {
-      if (updates[k] !== undefined) {
-        fields.push(`${map[k]} = $${++i}`);
+    const fields = [];
+    const values = [];
+    let i = 0;
+
+    Object.keys(map).forEach((key) => {
+      if (updates[key] !== undefined) {
+        fields.push(`${map[key]} = $${++i}`);
         values.push(
-          arrayFields.includes(k) ? toPgArray(updates[k]) : updates[k]
+          arrayFields.includes(key) ? toPgArray(updates[key]) : updates[key]
         );
       }
     });
@@ -624,16 +627,21 @@ router.put("/:id", validateRequest(updateInvestorSchema), async (req, res) => {
       return res.status(400).json({ error: "No fields to update" });
     }
 
+    // always update timestamp
     fields.push(`updated_at = NOW()`);
 
-    await db.query(
-      `
+    const query = `
       UPDATE investors
       SET ${fields.join(", ")}
       WHERE id = $${++i}
-      `,
-      [...values, id]
-    );
+      RETURNING id
+    `;
+
+    const result = await db.query(query, [...values, id]);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: "Investor not found" });
+    }
 
     res.json({ message: "Investor updated successfully" });
   } catch (err) {

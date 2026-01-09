@@ -1,4 +1,3 @@
-
 // api/importWorker.js
 require("dotenv").config();
 
@@ -7,11 +6,11 @@ const XLSX = require("xlsx");
 const path = require("path");
 const fs = require("fs");
 const pool = require("./database/database"); // pg pool
-const { investorMapper } = require("./utils/csvMapper");
+const { investorMapper } = require("./utils/csvMapper").default;
 const { prepareInvestorRecord } = require("./utils/investorService");
 
 // Redis connection
-const connection = { host: "127.0.0.1", port: 6379 };
+// const connection = { host: "127.0.0.1", port: 6379 };
 
 // Worker
 new Worker(
@@ -55,9 +54,7 @@ new Worker(
         result.rows.forEach((r) => existingEmails.add(r.email));
       }
 
-      const newRecordsRaw = records.filter(
-        (r) => !existingEmails.has(r.email)
-      );
+      const newRecordsRaw = records.filter((r) => !existingEmails.has(r.email));
 
       // --------------------------------------------
       // Prepare investor records
@@ -176,4 +173,3 @@ new Worker(
   },
   { connection }
 );
-
