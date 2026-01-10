@@ -1,16 +1,13 @@
-FROM node:18
+FROM node:18-alpine
 
-# Create app directory
 WORKDIR /usr/src/app
 
-# Install app dependencies
 COPY package*.json ./
+RUN npm ci --only=production
 
-RUN npm install
-
-# Bundle app source
 COPY . .
+
 
 EXPOSE 3001
 
-#sdas
+CMD ["node", "index.js"]
