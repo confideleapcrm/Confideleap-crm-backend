@@ -68,8 +68,6 @@ const PORT = process.env.PORT || 3000;
    SECURITY
 ======================= */
 
-app.set('trust proxy', 1);
-
 app.use(
   cors({
     origin: [
@@ -81,6 +79,8 @@ app.use(
     credentials: true,
   })
 );
+
+app.set('trust proxy', 1);
 
 /* =======================
    RATE LIMIT
