@@ -130,6 +130,15 @@ app.use('/api/interactions', authenticateToken, interactionsRoutes);
 
 app.use('/api/googleAuth', googleAuthRoutes);
 
+app.get("/db-test", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT 1");
+    res.json({ db: "connected", result: result.rows });
+  } catch (err) {
+    res.status(500).json({ db: "failed", error: err.message });
+  }
+});
+
 /* =======================
    404 HANDLER
 ======================= */
