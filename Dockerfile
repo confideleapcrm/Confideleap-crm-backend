@@ -1,16 +1,20 @@
-FROM node:18
+# ---- Base image ----
+FROM node:18-alpine
 
-# Create app directory
+# ---- Create app directory ----
 WORKDIR /usr/src/app
 
-# Install app dependencies
+# ---- Install dependencies first (better caching) ----
 COPY package*.json ./
 
-RUN npm install
+# Install only production dependencies
+RUN npm ci --only=production
 
-# Bundle app source
+# ---- Copy application source ----
 COPY . .
 
+# ---- Expose app port ----
 EXPOSE 3001
 
-CMD ["npm", "start"]
+# ---- Start app ----
+CMD ["node", "index.js"]
