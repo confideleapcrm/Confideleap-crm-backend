@@ -62,12 +62,12 @@ const { errorHandler } = require("./middleware/errorHandler");
 const { authenticateToken } = require("./middleware/auth");
 
 const app = express();
-const PORT = process.env.PORT || 4001;
+const PORT = process.env.PORT || 3000;
 
 /* =======================
    SECURITY
 ======================= */
-app.use(helmet());
+
 app.use(
   cors({
     origin: [
@@ -79,6 +79,8 @@ app.use(
     credentials: true,
   })
 );
+
+app.set('trust proxy', 1);
 
 /* =======================
    RATE LIMIT
@@ -139,6 +141,14 @@ app.use("/api/followups", authenticateToken, followupsRoutes);
 app.use("/api/interactions", authenticateToken, interactionsRoutes);
 
 app.use("/api/googleAuth", googleAuthRoutes);
+app.get("/db-test", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT 1");
+    res.json({ db: "connected", result: result.rows });
+  } catch (err) {
+    res.status(500).json({ db: "failed", error: err.message });
+  }
+});
 
 /* =======================
    404 HANDLER
@@ -155,9 +165,10 @@ app.use(errorHandler);
 /* =======================
    START SERVER
 ======================= */
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
 });
+
 
 module.exports = app;
