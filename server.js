@@ -80,7 +80,7 @@ app.use(
   })
 );
 
-app.set('trust proxy', 1);
+app.set("trust proxy", 1);
 
 /* =======================
    RATE LIMIT
@@ -110,6 +110,12 @@ app.get("/health", (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
+});
+
+// 2. No cache for API
+app.use("/api", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
 });
 
 /* =======================
@@ -169,6 +175,5 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || "development"}`);
 });
-
 
 module.exports = app;
