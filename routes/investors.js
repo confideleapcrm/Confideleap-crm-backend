@@ -20,18 +20,18 @@ const toPgArray = (val) => {
 /* ======================================================
    REDIS / QUEUE CONFIG (UNCHANGED)
 ====================================================== */
-// let connection;
-// if (process.env.REDIS_URL) {
-//   const redisUrl = new URL(process.env.REDIS_URL);
-//   connection = {
-//     host: redisUrl.hostname,
-//     port: Number(redisUrl.port),
-//     password: redisUrl.password || undefined,
-//     tls: redisUrl.protocol === "rediss:" ? {} : undefined,
-//   };
-// } else {
-//   connection = { host: "127.0.0.1", port: 6379 };
-// }
+let connection;
+if (process.env.REDIS_URL) {
+  const redisUrl = new URL(process.env.REDIS_URL);
+  connection = {
+    host: redisUrl.hostname,
+    port: Number(redisUrl.port),
+    password: redisUrl.password || undefined,
+    tls: redisUrl.protocol === "rediss:" ? {} : undefined,
+  };
+} else {
+  connection = { host: "127.0.0.1", port: 6379 };
+}
 
 const router = express.Router();
 
@@ -46,7 +46,7 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage });
-// const importQueue = new Queue("investor-import", { connection });
+const importQueue = new Queue("investor-import", { connection });
 
 /* ======================================================
    VALIDATION SCHEMAS (UNCHANGED)
@@ -746,7 +746,7 @@ router.get("/targeting/list", async (req, res) => {
         .map((f) => CATEGORY_MAP[f.toLowerCase()] || f)
         .filter(Boolean);
 
-      where.push(`i.firm_type = ANY($${++idx}::text[])`);
+      where.push(`f.type = ANY($${++idx}::text[])`);
       values.push(mapped);
     }
 
@@ -761,8 +761,20 @@ router.get("/targeting/list", async (req, res) => {
     }
 
     if (buySell.length) {
-      where.push(`i.buy_sell_side = ANY($${++idx}::text[])`);
-      values.push(buySell);
+      const normalizedBuySell = buySell
+        .map((v) => {
+          if (v === "Buy") return "buy";
+          if (v === "Sell") return "sell";
+          if (v === "Both") return ["buy", "sell"];
+          return null;
+        })
+        .flat()
+        .filter(Boolean);
+
+      if (normalizedBuySell.length) {
+        where.push(`i.buy_sell_side = ANY($${++idx}::text[])`);
+        values.push(normalizedBuySell);
+      }
     }
 
     if (rawSearch) {
