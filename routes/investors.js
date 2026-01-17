@@ -20,18 +20,18 @@ const toPgArray = (val) => {
 /* ======================================================
    REDIS / QUEUE CONFIG (UNCHANGED)
 ====================================================== */
-let connection;
-if (process.env.REDIS_URL) {
-  const redisUrl = new URL(process.env.REDIS_URL);
-  connection = {
-    host: redisUrl.hostname,
-    port: Number(redisUrl.port),
-    password: redisUrl.password || undefined,
-    tls: redisUrl.protocol === "rediss:" ? {} : undefined,
-  };
-} else {
-  connection = { host: "127.0.0.1", port: 6379 };
-}
+// let connection;
+// if (process.env.REDIS_URL) {
+//   const redisUrl = new URL(process.env.REDIS_URL);
+//   connection = {
+//     host: redisUrl.hostname,
+//     port: Number(redisUrl.port),
+//     password: redisUrl.password || undefined,
+//     tls: redisUrl.protocol === "rediss:" ? {} : undefined,
+//   };
+// } else {
+//   connection = { host: "127.0.0.1", port: 6379 };
+// }
 
 const router = express.Router();
 
@@ -46,7 +46,7 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage });
-const importQueue = new Queue("investor-import", { connection });
+// const importQueue = new Queue("investor-import", { connection });
 
 /* ======================================================
    VALIDATION SCHEMAS (UNCHANGED)
