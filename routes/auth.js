@@ -448,7 +448,7 @@ router.get(
   "/google/callback",
   passport.authenticate("google", {
     session: false,
-    failureRedirect: "https://irm.confideleap.com/login",
+    failureRedirect: "https://irm.confideleap.com/?error=google_failed",
   }),
   async (req, res) => {
     try {
@@ -481,14 +481,14 @@ router.get(
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         sameSite: "lax",
-        secure: isProduction, // true in production
+        secure: true, // true in production
         maxAge: 15 * 60 * 1000,
       });
 
       res.cookie("sessionToken", sessionToken, {
         httpOnly: true,
         sameSite: "lax",
-        secure: isProduction, // true in production
+        secure: true, // true in production
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
