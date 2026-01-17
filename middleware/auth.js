@@ -3,8 +3,9 @@ const jwt = require("jsonwebtoken");
 const pool = require("../database/database");
 
 const authenticateToken = async (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  const token = req.cookies?.accessToken;
+  // const authHeader = req.headers["authorization"];
+  // const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
     return res.status(401).json({ error: "Access token required" });
@@ -72,19 +73,3 @@ const authorize = (roles = []) => {
 };
 
 module.exports = { authenticateToken, authorize };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

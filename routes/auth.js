@@ -8,6 +8,8 @@ const crypto = require("crypto");
 const pool = require("../database/database");
 const { validateRequest } = require("../middleware/validation");
 const { generateAccessToken, generateSessionToken } = require("../utils/token");
+const passport = require("passport");
+require("../config/passport");
 
 const router = express.Router();
 
@@ -47,10 +49,9 @@ router.post("/register", validateRequest(registerSchema), async (req, res) => {
     const { email, password, firstName, lastName, jobTitle, department } =
       req.body;
 
-    const existing = await pool.query(
-      "SELECT id FROM users WHERE email = $1",
-      [email]
-    );
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [
+      email,
+    ]);
 
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: "User already exists" });
@@ -97,63 +98,65 @@ router.post("/register", validateRequest(registerSchema), async (req, res) => {
 /* ------------------------------------------------------------------
    LOGIN
 ------------------------------------------------------------------- */
-router.post("/login", validateRequest(loginSchema), async (req, res) => {
+router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const userResult = await pool.query(
-      `
-      SELECT id, email, password_hash, first_name, last_name,
-             job_title, department, avatar_url, is_active
-      FROM users
-      WHERE email = $1
-      `,
+    const result = await pool.query(
+      `SELECT id, email, password_hash, first_name, last_name, job_title, department, avatar_url, is_active
+       FROM users WHERE email = $1`,
       [email]
     );
 
-    if (userResult.rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    const user = userResult.rows[0];
+    const user = result.rows[0];
 
     if (!user.is_active) {
-      return res.status(401).json({ error: "Account is deactivated" });
+      return res.status(403).json({ error: "Account disabled" });
     }
 
-    const validPassword = await bcrypt.compare(
-      password,
-      user.password_hash
-    );
-
-    if (!validPassword) {
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    await pool.query(
-      "UPDATE users SET last_login_at = NOW() WHERE id = $1",
-      [user.id]
-    );
+    await pool.query("UPDATE users SET last_login_at = NOW() WHERE id = $1", [
+      user.id,
+    ]);
 
     const accessToken = generateAccessToken({
       userId: user.id,
       email: user.email,
     });
-
-    const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const sessionToken = generateSessionToken();
+    const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     await pool.query(
-      `
-      INSERT INTO user_sessions (user_id, session_token, expires_at)
-      VALUES ($1,$2,$3)
-      `,
+      `INSERT INTO user_sessions (user_id, session_token, expires_at)
+       VALUES ($1,$2,$3)`,
       [user.id, sessionToken, expiry]
     );
 
+    // 🍪 Set cookies
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false, // true in prod with https
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie("sessionToken", sessionToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
     res.json({
-      message: "Login successful",
-      userInfo: {
+      user: {
         id: user.id,
         email: user.email,
         firstName: user.first_name,
@@ -162,11 +165,9 @@ router.post("/login", validateRequest(loginSchema), async (req, res) => {
         department: user.department,
         avatarUrl: user.avatar_url,
       },
-      accessToken,
-      sessionToken,
     });
-  } catch (error) {
-    console.error("Login error:", error);
+  } catch (err) {
+    console.error("Login error:", err);
     res.status(500).json({ error: "Login failed" });
   }
 });
@@ -294,10 +295,10 @@ router.post(
 
       const hashedPassword = await bcrypt.hash(password, 12);
 
-      await pool.query(
-        "UPDATE users SET password_hash = $1 WHERE id = $2",
-        [hashedPassword, tokenResult.rows[0].user_id]
-      );
+      await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [
+        hashedPassword,
+        tokenResult.rows[0].user_id,
+      ]);
 
       await pool.query(
         "UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1",
@@ -316,16 +317,18 @@ router.post(
    LOGOUT
 ------------------------------------------------------------------- */
 router.post("/logout", async (req, res) => {
-  const { sessionToken } = req.body;
+  const { sessionToken } = req.cookies.sessionToken;
 
   if (sessionToken) {
-    await pool.query(
-      "DELETE FROM user_sessions WHERE session_token = $1",
-      [sessionToken]
-    );
+    await pool.query("DELETE FROM user_sessions WHERE session_token = $1", [
+      sessionToken,
+    ]);
   }
 
-  res.json({ message: "Logged out successfully" });
+  res.clearCookie("accessToken");
+  res.clearCookie("sessionToken");
+
+  res.json({ message: "Logged out successfully", success: true });
 });
 
 /* ------------------------------------------------------------------
@@ -333,7 +336,7 @@ router.post("/logout", async (req, res) => {
 ------------------------------------------------------------------- */
 router.get("/verify-session", async (req, res) => {
   try {
-    const { sessionToken } = req.query;
+    const sessionToken = req.cookies.sessionToken;
 
     if (!sessionToken) {
       return res.status(401).json({ error: "No session token provided" });
@@ -355,13 +358,27 @@ router.get("/verify-session", async (req, res) => {
 
     const session = result.rows[0];
 
+    if (!session.is_active) {
+      return res
+        .status(403)
+        .json({ error: "Unauthorized or session is not active" });
+    }
+
     if (new Date(session.expires_at) <= new Date()) {
       return res.status(401).json({ error: "Session expired" });
     }
 
+    // Generate the access token
     const accessToken = generateAccessToken({
       userId: session.user_id,
       email: session.email,
+    });
+
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      maxAge: 15 * 60 * 1000, // 15 min
     });
 
     res.json({
@@ -374,8 +391,8 @@ router.get("/verify-session", async (req, res) => {
         department: session.department,
         avatarUrl: session.avatar_url,
       },
-      accessToken,
-      sessionToken,
+      // accessToken,
+      // sessionToken,
     });
   } catch (error) {
     console.error("Verify session error:", error);
@@ -388,7 +405,10 @@ router.get("/verify-session", async (req, res) => {
 ------------------------------------------------------------------- */
 router.get("/me", async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    // const token = req.headers.authorization?.split(" ")[1];
+
+    const token = req.cookies.accessToken;
+
     if (!token) return res.status(401).json({ error: "Access token required" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -414,5 +434,68 @@ router.get("/me", async (req, res) => {
     res.status(500).json({ error: "Failed to get user" });
   }
 });
+
+router.get(
+  "/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    // prompt: "./"
+  })
+);
+
+router.get(
+  "/google/callback",
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: "http://localhost:5173/login",
+  }),
+  async (req, res) => {
+    try {
+      const { email } = req.user;
+
+      const result = await pool.query(
+        "SELECT id FROM users WHERE email = $1 AND is_active = true",
+        [email]
+      );
+
+      if (result.rows.length === 0) {
+        return res.redirect(
+          "http://localhost:5173/login?error=google_no_account"
+        );
+      }
+
+      const userId = result.rows[0].id;
+
+      const accessToken = generateAccessToken({ userId, email });
+      const sessionToken = generateSessionToken();
+      const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await pool.query(
+        `INSERT INTO user_sessions (user_id, session_token, expires_at)
+         VALUES ($1,$2,$3)`,
+        [userId, sessionToken, expiry]
+      );
+
+      res.cookie("accessToken", accessToken, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+        maxAge: 15 * 60 * 1000,
+      });
+
+      res.cookie("sessionToken", sessionToken, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+
+      res.redirect("http://localhost:5173");
+    } catch (error) {
+      console.error(error);
+      res.redirect("http://localhost:5173/login");
+    }
+  }
+);
 
 module.exports = router;
