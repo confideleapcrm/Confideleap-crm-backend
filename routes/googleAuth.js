@@ -164,7 +164,8 @@ router.get("/callback", async (req, res) => {
     } catch {}
 
     const returnUrl =
-      process.env.GOOGLE_AFTER_CONNECT_URL || "http://localhost:5173/settings";
+      process.env.GOOGLE_AFTER_CONNECT_URL ||
+      "https://irm.confideleap.com/settings";
 
     return res.redirect(returnUrl);
   } catch (err) {
