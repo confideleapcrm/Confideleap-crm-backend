@@ -9,11 +9,15 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 
   ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
+  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 
+  max: 10, // max connections
+  idleTimeoutMillis: 30000, // close idle clients after 30s
   max: 10, // max connections
   idleTimeoutMillis: 30000, // close idle clients after 30s
   connectionTimeoutMillis: 5000, // fail fast if DB unreachable
 
+  options: "-c search_path=public",
   options: "-c search_path=public",
 });
 
@@ -28,8 +32,18 @@ const pool = new Pool({
 //     process.exit(1); // crash fast (important in containers)
 //   }
 // })();
+// (async () => {
+//   try {
+//     const client = await pool.connect();
+//     console.log("PostgreSQL connected successfully");
+//     client.release();
+//   } catch (err) {
+//     console.error("PostgreSQL connection failed:", err.message);
+//     process.exit(1); // crash fast (important in containers)
+//   }
+// })();
 
-/* ---- Global pool error handler ---- */
+// /* ---- Global pool error handler ---- */
 // pool.on("error", (err) => {
 //   console.error("Unexpected PostgreSQL error", err);
 //   process.exit(1);
