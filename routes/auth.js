@@ -476,81 +476,19 @@ router.get(
          VALUES ($1,$2,$3)`,
         [userId, sessionToken, expiry]
       );
+      const isProduction = process.env.NODE_ENV === "production";
 
       res.cookie("accessToken", accessToken, {
         httpOnly: true,
         sameSite: "lax",
-        secure: false,
+        secure: isProduction, // true in production
         maxAge: 15 * 60 * 1000,
       });
 
       res.cookie("sessionToken", sessionToken, {
         httpOnly: true,
         sameSite: "lax",
-        secure: false,
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      });
-
-      res.redirect("https://irm.confideleap.com");
-    } catch (error) {
-      console.error(error);
-      res.redirect("https://irm.confideleap.com/login");
-    }
-  }
-);
-
-router.get(
-  "/google",
-  passport.authenticate("google", {
-    scope: ["profile", "email"],
-    // prompt: "./"
-  })
-);
-
-router.get(
-  "/google/callback",
-  passport.authenticate("google", {
-    session: false,
-    failureRedirect: "https://irm.confideleap.com/login",
-  }),
-  async (req, res) => {
-    try {
-      const { email } = req.user;
-
-      const result = await pool.query(
-        "SELECT id FROM users WHERE email = $1 AND is_active = true",
-        [email]
-      );
-
-      if (result.rows.length === 0) {
-        return res.redirect(
-          "https://irm.confideleap.com/login?error=google_no_account"
-        );
-      }
-
-      const userId = result.rows[0].id;
-
-      const accessToken = generateAccessToken({ userId, email });
-      const sessionToken = generateSessionToken();
-      const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-      await pool.query(
-        `INSERT INTO user_sessions (user_id, session_token, expires_at)
-         VALUES ($1,$2,$3)`,
-        [userId, sessionToken, expiry]
-      );
-
-      res.cookie("accessToken", accessToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
-        maxAge: 15 * 60 * 1000,
-      });
-
-      res.cookie("sessionToken", sessionToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        secure: false,
+        secure: isProduction, // true in production
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
