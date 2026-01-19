@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  backend:
+    build: "."
+    container_name: confideleap-backend-crm
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    restart: always
+
+  postgres:
+    image: postgres:15
+    container_name: confideleap-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: investor_relations_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  postgres_data:
